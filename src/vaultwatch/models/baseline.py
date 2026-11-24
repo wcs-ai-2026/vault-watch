@@ -15,8 +15,11 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 # VW-28: Logistic regression baseline on the PaySim seed sample.
-# Uses the VW-18 chronological split: steps 1-323 train, 324-378 validation.
-# The test split (379-743) is held out and not touched here.
+# Uses the VW-18 chronological split: steps 1-323 train, 324-378 validation, 379-743 test.
+# Metrics are reported on validation only. The test split is just scored to write
+# predictions/baseline_test.csv; nothing is tuned on it.
+#
+# Run from the repo root: python src/vaultwatch/models/baseline.py
 
 NUMERIC_FEATURES = ["amount", "oldbalanceOrg", "newbalanceOrig", "oldbalanceDest", "newbalanceDest"]
 CATEGORICAL_FEATURES = ["type"]
@@ -64,6 +67,18 @@ class LogRegModel:
         return model
 
 
+def write_predictions(rows, output_path):
+    # txn_id uses the same seed-row scheme as iforest.py so predictions from different models line up
+    predictions = pd.DataFrame({
+        "txn_id": [f"seed-{row_number:06d}" for row_number in rows.index],
+        "score": rows["score"].to_numpy(),
+    })
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    predictions.to_csv(output_path, index=False)
+    print(f"Saved {len(predictions):,} predictions to {output_path}")
+
+
 def main():  # main driver function
 
     transactions = pd.read_parquet("data/seed/paysim_sample.parquet")
@@ -97,18 +112,16 @@ def main():  # main driver function
     print("Confusion matrix [[TN FP] [FN TP]]:")
     print(confusion_matrix(validation_labels, flagged, labels=[0, 1]))
 
-    # save validation predictions in the same format as the other models (txn_id, score)
-    predictions = pd.DataFrame({
-        "txn_id": [f"seed-{row_number:06d}" for row_number in validation_rows.index],
-        "score": validation_rows["score"].to_numpy(),
-    })
-    output_path = Path("data/processed/logreg_seed_val.csv")
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    predictions.to_csv(output_path, index=False)
-    print(f"\nSaved {len(predictions):,} predictions to {output_path}")
+    # save predictions in the contract format: predictions/<model>_<split>.csv -> txn_id, score
+    # test rows are only scored here, never used for tuning (the test set is locked)
+    test_rows = transactions[transactions["step"] >= 379].copy()
+    test_rows["score"] = model.predict_score(test_rows[FEATURE_COLUMNS])
+    for split_name, rows in [("val", validation_rows), ("test", test_rows)]:
+        write_predictions(rows, f"predictions/baseline_{split_name}.csv")
 
     # save the model, reload it, and check it gives the same scores
     model_path = Path("data/processed/logreg_seed.joblib")
+    model_path.parent.mkdir(parents=True, exist_ok=True)
     model.save(model_path)
     reloaded_model = LogRegModel.load(model_path)
     example_features = validation_rows[FEATURE_COLUMNS].head(5)
