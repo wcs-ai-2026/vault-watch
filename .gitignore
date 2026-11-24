@@ -223,3 +223,6 @@ __marimo__/
 data/raw/
 data/processed/
 
+
+# Saved model files (too big for GitHub; shared through the Drive folder)
+models_saved/

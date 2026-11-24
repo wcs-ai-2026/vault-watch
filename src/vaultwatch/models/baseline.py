@@ -120,7 +120,8 @@ def main():  # main driver function
         write_predictions(rows, f"predictions/baseline_{split_name}.csv")
 
     # save the model, reload it, and check it gives the same scores
-    model_path = Path("data/processed/logreg_seed.joblib")
+    # saved models live in models_saved/ (ignored by git, shared through the Drive folder)
+    model_path = Path("models_saved/baseline_seed.joblib")
     model_path.parent.mkdir(parents=True, exist_ok=True)
     model.save(model_path)
     reloaded_model = LogRegModel.load(model_path)
