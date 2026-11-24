@@ -18,8 +18,19 @@ def test_fit_returns_the_model(toy_transactions):
 
 def test_auto_scale_pos_weight_is_normal_to_fraud_ratio(toy_transactions):
     y = toy_transactions["isFraud"]
-    model = XGBModel(**FAST).fit(toy_transactions[FEATURE_COLUMNS], y)
+    model = XGBModel(scale_pos_weight="auto", **FAST).fit(toy_transactions[FEATURE_COLUMNS], y)
     assert model.fitted_scale_pos_weight == pytest.approx((y == 0).sum() / (y == 1).sum())
+
+
+def test_sqrt_scale_pos_weight_is_square_root_of_the_ratio(toy_transactions):
+    y = toy_transactions["isFraud"]
+    model = XGBModel(scale_pos_weight="sqrt", **FAST).fit(toy_transactions[FEATURE_COLUMNS], y)
+    assert model.fitted_scale_pos_weight == pytest.approx(((y == 0).sum() / (y == 1).sum()) ** 0.5)
+
+
+def test_default_is_no_reweighting(toy_transactions):
+    model = XGBModel(**FAST).fit(toy_transactions[FEATURE_COLUMNS], toy_transactions["isFraud"])
+    assert model.fitted_scale_pos_weight == 1
 
 
 def test_predict_score_is_one_score_between_0_and_1_per_row(toy_transactions):

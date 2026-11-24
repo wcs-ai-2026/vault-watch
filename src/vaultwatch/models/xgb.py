@@ -29,15 +29,18 @@ FEATURE_COLUMNS = NUMERIC_FEATURES + ["type"]
 #   isFlaggedFraud      -> PaySim's own rule, would leak label-like info
 #   step                -> only used for splitting
 
-# v1 settings. scale_pos_weight="auto" means (normal rows / fraud rows) in the training data,
-# so each fraud row counts as much as all the normal rows it is outnumbered by.
+# Settings chosen in VW-30 on the full validation split (see DECISIONS.md and docs/tuning/).
+# scale_pos_weight=1 means no reweighting: on full PaySim, reweighting did not rank fraud any
+# better, it only pushed every score up. The class imbalance is handled by picking the alert
+# threshold instead (see docs/xgb_report.md). scale_pos_weight="auto" (normal rows / fraud rows)
+# and "sqrt" are still supported for experiments.
 DEFAULT_PARAMS = {
     "n_estimators": 300,
-    "max_depth": 4,
+    "max_depth": 6,
     "learning_rate": 0.1,
     "subsample": 0.8,
     "colsample_bytree": 0.8,
-    "scale_pos_weight": "auto",
+    "scale_pos_weight": 1,
 }
 
 
@@ -63,8 +66,11 @@ class XGBModel:
             raise ValueError("Training needs both fraud and normal transactions.")
 
         params = dict(self.params)
+        ratio = (labels == 0).sum() / (labels == 1).sum()
         if params["scale_pos_weight"] == "auto":
-            params["scale_pos_weight"] = (labels == 0).sum() / (labels == 1).sum()
+            params["scale_pos_weight"] = ratio
+        elif params["scale_pos_weight"] == "sqrt":
+            params["scale_pos_weight"] = np.sqrt(ratio)
         self.fitted_scale_pos_weight = params["scale_pos_weight"]
 
         self.booster = XGBClassifier(

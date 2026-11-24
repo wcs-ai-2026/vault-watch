@@ -26,7 +26,7 @@ RAW_PATH = Path("data/raw/PS_20174392719_1491204439457_log.csv")
 SEED_PATH = Path("data/seed/paysim_sample.parquet")
 TARGET_RECALL = 0.85  # project goal: catch 85%+ of fraud
 
-# What we try. "auto" = normal/fraud ratio in training (~775 on full data, ~1215 on the seed),
+# What we try. "auto" = normal/fraud ratio in training (~1224 on full data, ~1215 on the seed),
 # "sqrt" = its square root, 1 = no reweighting at all.
 GRID = {
     "scale_pos_weight": [1, "sqrt", "auto"],
